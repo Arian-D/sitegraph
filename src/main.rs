@@ -4,27 +4,29 @@ use std::env;
 use scraper::{Html, Selector};
 use reqwest::Url;
 use async_recursion::async_recursion;
-use log::debug;
+use petgraph::Graph;
+use clap::Parser;
 
+/// Create a dot graph of a site's links
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// URL of a site to scan
+    url: String,
 
+    /// Regex to exclude certain links
+    #[arg(short, long)]
+    filter: Option<String>,
+}
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args: Vec<String> = env::args().collect();
-    let url = &args[1];
-    // let set = links_set(url.clone(), HashSet::new()).await?;
-    // println!("{:?}", set);
+    let args = Args::parse();
+    let url = args.url;
     let mut visited_urls: HashSet<String> = HashSet::new();
-    dfs(url, &mut visited_urls).await;
+    dfs(&url, &mut visited_urls).await;
     println!("{visited_urls:?}");
     Ok(())
 }
-
-// async fn links_set(url: String, graph: HashSet<(String, String)>) -> Result<HashSet<(String, String)>, Box<dyn std::error::Error>> {
-//     let original_url = url.clone();
-//     let links = collect_links(&url, ).await?;
-//     let set: HashSet<(String, String)> = links.into_iter().map(|link| (original_url.clone(), link)).collect();
-//     Ok(set)
-// }
 
 #[async_recursion]
 async fn dfs(url: &str, visited: &mut HashSet<String>) {
@@ -47,6 +49,7 @@ async fn read_page(url: &str) -> Result<String, reqwest::Error>  {
         .await
 }
 
+// TODO: Make this iter
 async fn collect_links(url: &str, content: String) -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let domain = get_domain(url.to_string());
     let page = Html::parse_document(&content);
@@ -55,7 +58,6 @@ async fn collect_links(url: &str, content: String) -> Result<Vec<String>, Box<dy
         .select(&tags_selector)
         .filter_map(|e| e.value().attr("href"))
         .filter(|href| {
-            // println!("{:?} == {:?} = {}", get_domain(href.to_string()), domain, get_domain(href.to_string()) == domain);
             get_domain(href.to_string()) == domain
         })
         .map(String::from)
